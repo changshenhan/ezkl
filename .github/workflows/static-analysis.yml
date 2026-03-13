@@ -2,9 +2,10 @@ name: Static Analysis
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, pr-custom-lookup ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, pr-custom-lookup ]
+  workflow_dispatch:
 
 jobs:
   analyze:
