@@ -1,15 +1,16 @@
 name: Rust
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "pr-custom-lookup"]
     paths-ignore:
       - "README.md"
       - "cla.md"
   pull_request:
-    branches: ["main"]
+    branches: ["main", "pr-custom-lookup"]
     paths-ignore:
       - "README.md"
       - "cla.md"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
