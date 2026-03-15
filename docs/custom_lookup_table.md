@@ -25,9 +25,9 @@ An example for a 4-segment sigmoid approximation is in `examples/pwl_sigmoid_exa
 
 ## Caveats and soundness
 
+- **Input must be within the defined breakpoints.** The circuit **enforces** this: if the lookup range (from `run_args.lookup_range`, converted to float using the op scale) extends outside `[breakpoints[0], breakpoints[n]]`, EZKL returns a clear error. For example, if your PWL is defined only on `[-5, 5]` but the model or calibration produces inputs equivalent to 10, you must either extend the breakpoints in your JSON to cover that range or reduce `lookup_range` so that the float range stays within the breakpoints.
 - **Correctness:** The PWL table is used both for the circuit (constraint system) and for witness generation. If the table does not match the function your model was trained with (e.g. a poor approximation of sigmoid), the committed output may differ from the true model output, which can lead to failed verification or unsound claims.
-- **Range:** Inputs outside the breakpoint range are extrapolated using the first or last segment. Ensure your breakpoints cover the actual input range (see calibration) to avoid large approximation error.
-- **Error handling:** Invalid JSON, non-increasing breakpoints, or mismatched array lengths will produce clear errors at load time (see `src/circuit/ops/lookup.rs`). The loader validates structure and reports soundness-related warnings where applicable.
+- **Error handling:** Invalid JSON, non-increasing breakpoints, mismatched array lengths, or input range outside breakpoints produce clear errors (see `src/circuit/ops/lookup.rs`). The loader validates structure and reports soundness-related warnings where applicable.
 
 ## Usage
 

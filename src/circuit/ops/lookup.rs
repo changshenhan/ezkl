@@ -88,6 +88,8 @@ fn get_pwl_cached(path: &str) -> Result<PwlParams, TensorError> {
 }
 
 /// Apply piecewise-linear map: x_float -> y_float using loaded params, then quantize with scale.
+/// Fails with a clear error if the input range (in float) extends outside the PWL breakpoints,
+/// to avoid unsound extrapolation (e.g. PWL defined on [-5, 5] but model input 10).
 fn apply_pwl(
     x: &Tensor<IntegerRep>,
     scale_mult: f64,
@@ -97,6 +99,29 @@ fn apply_pwl(
     let sl = &pwl.slopes;
     let ic = &pwl.intercepts;
     let n = sl.len();
+    let bp_min = bp[0];
+    let bp_max = bp[n];
+
+    let min_int = x
+        .iter()
+        .copied()
+        .min()
+        .ok_or_else(|| TensorError::InvalidArgument("custom lookup: empty input range".to_string()))?;
+    let max_int = x
+        .iter()
+        .copied()
+        .max()
+        .ok_or_else(|| TensorError::InvalidArgument("custom lookup: empty input range".to_string()))?;
+    let min_float = min_int as f64 / scale_mult;
+    let max_float = max_int as f64 / scale_mult;
+    if min_float < bp_min || max_float > bp_max {
+        return Err(TensorError::InvalidArgument(format!(
+            "custom lookup: input range [{}, {}] (float) must be within PWL breakpoints [{}, {}]. \
+             Either extend breakpoints in your JSON to cover the circuit lookup range, or reduce run_args.lookup_range.",
+            min_float, max_float, bp_min, bp_max
+        )));
+    }
+
     let res = x.map(|int_val| {
         let x_float = int_val as f64 / scale_mult;
         let y_float = if x_float <= bp[0] {
