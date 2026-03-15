@@ -39,16 +39,27 @@ struct PwlParams {
 
 fn load_pwl_from_path(path: &str) -> Result<PwlParams, TensorError> {
     let s = fs::read_to_string(Path::new(path))
-        .map_err(|e| TensorError::FileLoadError(e.to_string()))?;
+        .map_err(|e| TensorError::FileLoadError(format!("custom lookup file '{}': {}", path, e)))?;
     let p: PwlParams = serde_json::from_str(&s)
-        .map_err(|e| TensorError::InvalidArgument(format!("custom lookup JSON: {}", e)))?;
+        .map_err(|e| TensorError::InvalidArgument(format!("custom lookup JSON ({}): {}", path, e)))?;
     if p.breakpoints.len() < 2
         || p.slopes.len() != p.breakpoints.len() - 1
         || p.intercepts.len() != p.breakpoints.len() - 1
     {
         return Err(TensorError::InvalidArgument(
-            "custom lookup: breakpoints (n+1), slopes (n), intercepts (n)".to_string(),
+            "custom lookup: require breakpoints (n+1), slopes (n), intercepts (n) with n>=1".to_string(),
         ));
+    }
+    for i in 1..p.breakpoints.len() {
+        if p.breakpoints[i] <= p.breakpoints[i - 1] {
+            return Err(TensorError::InvalidArgument(format!(
+                "custom lookup: breakpoints must be strictly increasing; got breakpoints[{}]={} <= breakpoints[{}]={}",
+                i,
+                p.breakpoints[i],
+                i - 1,
+                p.breakpoints[i - 1]
+            )));
+        }
     }
     Ok(p)
 }
@@ -68,6 +79,10 @@ fn get_pwl_cached(path: &str) -> Result<PwlParams, TensorError> {
         return Ok(p.clone());
     }
     let p = load_pwl_from_path(path)?;
+    log::warn!(
+        "custom lookup loaded from '{}': ensure this PWL approximates the intended activation (e.g. sigmoid) to avoid soundness issues or proof failure",
+        path
+    );
     m.insert(path.to_string(), p.clone());
     Ok(p)
 }
